@@ -22,6 +22,12 @@ class Prometheus2_state:
         self.theta1_bounds = config["theta1_bounds"]
         self.theta2a_bounds = config["theta2a_bounds"]
         self.theta3_bounds = config["theta3_bounds"]
+        self.T01 = self.trans_x(1)
+        self.T02 = self.trans_x(1)
+        self.T03a = self.trans_x(1)
+        self.T03b = self.trans_x(1)
+        self.T04 = self.trans_x(1)
+
         self.angle_step = np.deg2rad(5)
         self.ee_step = 0.1
 
@@ -96,29 +102,72 @@ class Prometheus2_state:
 
     def compute_fk(self):
         # transformation matrices
-        T01 = self.rot_x(self.theta0)
-        T12 = self.rot_z(self.theta1) @ self.trans_y(self.l1)
-        T23a = self.rot_z(self.theta2a) @ self.trans_y(self.l2a)
-        T23b = self.rot_z(self.theta2b) @ self.trans_y(self.l2b)
-        T34 = self.rot_z(self.theta3) @ self.trans_y(self.l3)
+        self.T01 = self.rot_y(self.theta0)
+        T12 = self.rot_z(self.theta1) @ self.trans_x(self.l1)
+        T23a = self.rot_z(self.theta2a) @ self.trans_x(self.l2a)
+        T23b = self.rot_z(self.theta2b) @ self.trans_x(self.l2b)
+        T34 = self.rot_z(self.theta3) @ self.trans_x(self.l3)
 
-        T02 = T01 @ T12
-        T03a = T02 @ T23a
-        T03b = T03a @ T23b
-        T04 = T03b @ T34
+        self.T02 = self.T01 @ T12
+        self.T03a = self.T02 @ T23a
+        self.T03b = self.T03a @ T23b
+        self.T04 = self.T03b @ T34
 
-        self.l1_pos = T02 @ [0,0,0,1]
-        self.l2a_pos = T03a @ [0,0,0,1]
-        self.l2b_pos = T03b @ [0,0,0,1]
-        self.ee_pos = T04 @ [0,0,0,1]
+        self.l1_pos = self.T02 @ [0,0,0,1]
+        self.l2a_pos = self.T03a @ [0,0,0,1]
+        self.l2b_pos = self.T03b @ [0,0,0,1]
+        self.ee_pos = self.T04 @ [0,0,0,1]
 
 
-    def compute_jacobian(self, eps=1e-6):
-        pass
-    
+    def compute_jacobian(self):
 
-    def move_ee(self, target_x, target_y):
-        pass
+        # Make sure FK is current
+        self.compute_fk()
+
+        # End effector position
+        p_e = self.ee_pos[0:3].flatten()
+
+        # Joint origins
+        p0 = np.array([0,0,0])
+        p1 = self.T01[0:3, 3]
+        p2 = self.T02[0:3, 3]
+        p3 = self.T03a[0:3, 3]
+
+        # Joint axes in world frame
+        # Joint 0 rotates about X axis
+        z0 = self.T01[0:3, 0]
+
+        # Others rotate about Z axis
+        z1 = self.T02[0:3, 2]
+        z2 = self.T03a[0:3, 2]
+        z3 = self.T03b[0:3, 2]
+
+        # Build Jacobian
+        J = np.zeros((3,4))
+
+        J[:,0] = np.cross(z0, p_e - p0)
+        J[:,1] = np.cross(z1, p_e - p1)
+        J[:,2] = np.cross(z2, p_e - p2)
+        J[:,3] = np.cross(z3, p_e - p3)
+
+        return J
+
+    def move_ee(self, target:np.array, threshold = 1e-4):
+
+        for i in range(20):
+            self.compute_fk()
+            error = target[0:3] - self.ee_pos[0:3]
+            if abs(np.sum(error)) < threshold:
+                break
+            J = self.compute_jacobian()
+            dtheta = np.linalg.pinv(J) @ error
+
+            step = 0.3
+            self.theta0 += step * dtheta[0]
+            self.theta1 += step * dtheta[1]
+            self.theta2a += step * dtheta[2]
+            self.theta3 += step * dtheta[3]
+            
 
 
 arm_state = Prometheus2_state()
@@ -132,7 +181,7 @@ fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.set_xlim(-4, 4)
 ax.set_ylim(-4, 4)
-ax.set_zlim(-4,4)
+ax.set_zlim(-4, 4)
 ax.set_aspect('equal')
 ax.set_xscale("linear")
 ax.set_yscale("linear")
@@ -200,7 +249,7 @@ def on_key(event):
     global arm_state
 
 
-    if event.key == 'zf':
+    if event.key == 'f':
         arm_state.theta0 += arm_state.angle_step
         arm_state.compute_fk()
         arm_state.print_angles()
@@ -234,19 +283,31 @@ def on_key(event):
         arm_state.print_angles()
 
     elif event.key == 'o':
-        arm_state.move_ee(arm_state.ee_pos[0], arm_state.ee_pos[1] + arm_state.ee_step)
+        target = np.round(arm_state.ee_pos + np.array([0, arm_state.ee_step, 0, 0]), 4)
+        arm_state.move_ee(target)
     elif event.key == 'l':
-        arm_state.move_ee(arm_state.ee_pos[0], arm_state.ee_pos[1] - arm_state.ee_step)
+        target = np.round(arm_state.ee_pos + np.array([0, -arm_state.ee_step, 0, 0]), 4)
+        arm_state.move_ee(target)
     elif event.key == ';':
-        arm_state.move_ee(arm_state.ee_pos[0] + arm_state.ee_step, arm_state.ee_pos[1])
+        target = np.round(arm_state.ee_pos + np.array([arm_state.ee_step, 0, 0, 0]), 4)
+        arm_state.move_ee(target)
     elif event.key == 'k':
-        arm_state.move_ee(arm_state.ee_pos[0] - arm_state.ee_step, arm_state.ee_pos[1])
-    
+        target = np.round(arm_state.ee_pos + np.array([-arm_state.ee_step, 0, 0, 0]), 4)
+        arm_state.move_ee(target)
+    elif event.key == 'p':
+        target = np.round(arm_state.ee_pos + np.array([0, 0, arm_state.ee_step, 0]), 4)
+        arm_state.move_ee(target)
+    elif event.key == 'i':
+        target = np.round(arm_state.ee_pos + np.array([0, 0, -arm_state.ee_step, 0]), 4)
+        arm_state.move_ee(target)
+
+
     update_plot()
     arm_state.print_positions()
     
 
 fig.canvas.mpl_connect('key_press_event', on_key)
 update_plot()
+arm_state.print_positions()
 plt.title("Prometheus2 movement simulator")
 plt.show()
