@@ -58,6 +58,8 @@ class Prometheus2_state:
         print("Theta2: ", self.theta2a)
         print("Theta3: ", self.theta3)
 
+
+
     def rot_x(self, theta):
         rot = np.array([[1,0,0,0],
                        [0, np.cos(theta), -np.sin(theta),0],
@@ -118,7 +120,6 @@ class Prometheus2_state:
         self.l2b_pos = self.T03b @ [0,0,0,1]
         self.ee_pos = self.T04 @ [0,0,0,1]
 
-
     def compute_jacobian(self):
 
         # Make sure FK is current
@@ -154,6 +155,14 @@ class Prometheus2_state:
 
     def move_ee(self, target:np.array, threshold = 1e-4):
 
+        old_theta0 = self.theta0
+        old_theta1 = self.theta1
+        old_theta2a = self.theta2a
+        old_theta3 = self.theta3
+        old_ee_pos = self.ee_pos
+        error = target[0:3] - self.ee_pos[0:3]
+        old_error = error
+
         for i in range(20):
             self.compute_fk()
             error = target[0:3] - self.ee_pos[0:3]
@@ -164,10 +173,27 @@ class Prometheus2_state:
 
             step = 0.3
             self.theta0 += step * dtheta[0]
+            self.theta0 = np.clip(self.theta0, self.theta0_bounds[0], self.theta0_bounds[1])
             self.theta1 += step * dtheta[1]
+            self.theta1 = np.clip(self.theta1, self.theta1_bounds[0], self.theta1_bounds[1])
             self.theta2a += step * dtheta[2]
+            self.theta2a = np.clip(self.theta2a, self.theta2a_bounds[0], self.theta2a_bounds[1])
             self.theta3 += step * dtheta[3]
-            
+            self.theta3 = np.clip(self.theta3, self.theta3_bounds[0], self.theta3_bounds[1])
+        
+        # if not converged to target then backtrack
+        # if abs(np.sum(old_error))*0.1 < abs(np.sum(error)) :
+        #     self.theta0 = old_theta0
+        #     self.theta1 = old_theta1
+        #     self.theta2a = old_theta2a
+        #     self.theta3 = old_theta3
+        #     print("IK FAILED TO CONVERGE")
+        
+        self.compute_fk()
+
+        
+
+        
 
 
 arm_state = Prometheus2_state()
@@ -248,37 +274,52 @@ def update_plot():
 def on_key(event):
     global arm_state
 
-
-    if event.key == 'f':
+    if event.key == 'r':
+        print("RESETING...")
+        arm_state.theta0 = config["theta0"]
+        arm_state.theta1 = config["theta1"]
+        arm_state.theta2a = config["theta2a"]
+        arm_state.theta2b = config["theta2b"]
+        arm_state.theta3 = config["theta3"]
+        arm_state.compute_fk()
+    elif event.key == 'f':
         arm_state.theta0 += arm_state.angle_step
+        arm_state.theta0 = np.clip(arm_state.theta0, arm_state.theta0_bounds[0], arm_state.theta0_bounds[1])
         arm_state.compute_fk()
         arm_state.print_angles()
     elif event.key == 'v':
         arm_state.theta0 -= arm_state.angle_step
+        arm_state.theta0 = np.clip(arm_state.theta0, arm_state.theta0_bounds[0], arm_state.theta0_bounds[1])
         arm_state.compute_fk()
         arm_state.print_angles()
     elif event.key == 'g':
         arm_state.theta1 += arm_state.angle_step
+        arm_state.theta1 = np.clip(arm_state.theta1, arm_state.theta1_bounds[0], arm_state.theta1_bounds[1])
         arm_state.compute_fk()
         arm_state.print_angles()
     elif event.key == 'b':
         arm_state.theta1 -= arm_state.angle_step
+        arm_state.theta1 = np.clip(arm_state.theta1, arm_state.theta1_bounds[0], arm_state.theta1_bounds[1])
         arm_state.compute_fk()
         arm_state.print_angles()
     elif event.key == 'h':
         arm_state.theta2a += arm_state.angle_step
+        arm_state.theta2a = np.clip(arm_state.theta2a, arm_state.theta2a_bounds[0], arm_state.theta2a_bounds[1])
         arm_state.compute_fk()
         arm_state.print_angles()
     elif event.key == 'n':
         arm_state.theta2a -= arm_state.angle_step
+        arm_state.theta2a = np.clip(arm_state.theta2a, arm_state.theta2a_bounds[0], arm_state.theta2a_bounds[1])
         arm_state.compute_fk()
         arm_state.print_angles()
     elif event.key == 'j':
         arm_state.theta3 += arm_state.angle_step
+        arm_state.theta3 = np.clip(arm_state.theta3, arm_state.theta3_bounds[0], arm_state.theta3_bounds[1])
         arm_state.compute_fk()
         arm_state.print_angles()
     elif event.key == 'm':
         arm_state.theta3 -= arm_state.angle_step
+        arm_state.theta3 = np.clip(arm_state.theta3, arm_state.theta3_bounds[0], arm_state.theta3_bounds[1])
         arm_state.compute_fk()
         arm_state.print_angles()
 
