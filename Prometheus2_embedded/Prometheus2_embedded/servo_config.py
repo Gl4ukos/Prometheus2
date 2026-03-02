@@ -25,6 +25,15 @@ servo_wrist_config = {
         "start_d": 5250
     }
 
+servo_base_config = {
+        "pin": 5,
+        "max_d": 8500, 
+        "min_d": 2000,
+        "home_d": 5250,
+        "start_d": 5250
+    }
+
+
 # SERVOS DEFINITION
 class servo:
     def __init__(self, servo_config_dict):
