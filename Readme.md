@@ -13,6 +13,8 @@ the movement of the arm is displayed in real time by a 3D python plot.
 !! This code despite being functional has not been imported to the microcontroller because there is no numpy librady for pico, which is used extensively in the script.
 
 TODO: 
+-> !! Upload stl files  
+
 -> Find and compile firmware for the pico, which includes "ulab", to support linear algebra calculations.
 -> Import Inverse Kinematics code to pico
 
