@@ -3,7 +3,6 @@ The directory named "Prometheus2_embedded" contains all code already existent on
 while the scripts outside of it have not yet been integrated, although completely functional.
 
 ![alt text](IMG_3103b_small.png)
-![alt text](IMG_3103a_small.png)
 
 The config file, simply includes a python dictionary that contains all information about the arm, such as link lengths, joint angle limits etc.
 
