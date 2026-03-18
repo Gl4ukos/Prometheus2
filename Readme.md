@@ -2,8 +2,8 @@ This code operates a 4DoF, 3D printed, robotic arm called Prometheus.
 The directory named "Prometheus2_embedded" contains all code already existent on the arm's microcontroller (Raspberry pi Pico),
 while the scripts outside of it have not yet been integrated, although completely functional.
 
-![alt text](IMG_3103b_small.JPG)
-![alt text](IMG_3103a_small.JPG)
+![alt text](IMG_3103b_small.PNG)
+![alt text](IMG_3103a_small.PNG)
 
 The config file, simply includes a python dictionary that contains all information about the arm, such as link lengths, joint angle limits etc.
 
